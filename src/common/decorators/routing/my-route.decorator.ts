@@ -2,6 +2,7 @@ import { applyDecorators, SerializeOptions, Type } from '@nestjs/common';
 import { ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { OtherApiResponses } from '../other-api-responses.decorator';
 import { JwtAuth } from '../jwt-auth.decorator';
+import { MustBeInGroup } from '../must-be-in-group.decorator';
 
 export type MyRouteOptions = {
     path?: string;
@@ -19,6 +20,7 @@ export type MyRouteOptions = {
         isArray?: boolean;
     }[];
     jwtAuth?: boolean;
+    mustBeInGroup?: boolean;
 }
 
 export function MyRoute(options: MyRouteOptions) {
@@ -50,8 +52,12 @@ export function MyRoute(options: MyRouteOptions) {
         }
     }
 
-    if (options.jwtAuth) {
+    if (options.jwtAuth || options.mustBeInGroup) {
         decorators.push(JwtAuth());
+
+        if (options.mustBeInGroup) {
+            decorators.push(MustBeInGroup());
+        }
     }
 
     return applyDecorators(...decorators);
