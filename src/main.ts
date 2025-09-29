@@ -3,11 +3,28 @@ import { AppModule } from './app.module';
 import { ClassSerializerInterceptor, INestApplication, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { MongoExceptionFilter } from './common/filters/mongo-exception.filter';
+import { ConfigService } from '@nestjs/config';
 
 function configureGlobalFilters(app: INestApplication<any>) {
   app.useGlobalFilters(
     new MongoExceptionFilter(),
   );
+}
+
+function configureCors(app: INestApplication<any>) {
+  const configService: ConfigService = app.get(ConfigService);
+
+  const frontendUrls = configService.get<string[]>('FRONTEND_URLS') || [];
+
+  const corsConfig = {
+    origin: frontendUrls,
+    methods: 'HEAD,GET,POST,PUT,PATCH,DELETE,OPTIONS,TRACE,CONNECT',
+    credentials: true, // allow cookies/Authorization headers
+  };
+
+  console.info('CORS configuration:', corsConfig);
+
+  app.enableCors(corsConfig);
 }
 
 function configureSwagger(app: INestApplication<any>) {
@@ -16,7 +33,17 @@ function configureSwagger(app: INestApplication<any>) {
     .setTitle('My API')
     .setDescription('Auto-generated API docs')
     .setVersion('1.0')
-    .addBearerAuth() // optional, if you want JWT auth in docs
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'JWT',
+        description: 'Nhập JWT token',
+        in: 'header',
+      },
+      'jwt',
+    )
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document, {
@@ -34,6 +61,7 @@ function configureApp(app: INestApplication<any>) {
   configureClassSerializer(app);
   app.useGlobalPipes(new ValidationPipe());
   configureSwagger(app);
+  configureCors(app);
   configureGlobalFilters(app);
 }
 

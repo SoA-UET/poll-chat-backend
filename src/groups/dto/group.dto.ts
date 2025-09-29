@@ -3,16 +3,12 @@ import { Exclude, Expose } from "class-transformer";
 import { ExposeId } from "src/common/decorators/expose-id.decorator";
 
 @Exclude()
-export class UserDto {
+export class GroupDto {
     @ApiProperty()
     @ExposeId()
     readonly id?: string;
 
     @ApiProperty()
     @Expose()
-    readonly email: string;
-
-    @ApiProperty()
-    @Expose()
-    readonly fullName: string;
-};
+    readonly name: string;
+}

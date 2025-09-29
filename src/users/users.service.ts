@@ -8,26 +8,33 @@ import { PutUserDto } from "./dto/put-user.dto";
 import * as bcrypt from 'bcrypt';
 import { UserDto } from "./dto/user.dto";
 import { PatchUserDTO } from "./dto/patch-user-dto";
-
-const PASSWORD_HASH_ROUNDS = 10;
+import { PASSWORD_HASH_ROUNDS } from "src/common/utils/constants";
 
 @Injectable()
 export class UsersService {
     constructor(
         @InjectModel(User.name) private userModel: Model<UserDocument>
-    ) {}
+    ) { }
 
     async findAll(): Promise<UserDto[]> {
         return await this.userModel.find().exec();
     }
 
     async findById(id: string): Promise<UserDto | null> {
-       // Validate ObjectId format using mongoose's built-in validator
-       if (!isValidObjectId(id)) {
-           return null;
-       }
-       return await this.userModel.findById(id).exec();
-   }
+        // Validate ObjectId format using mongoose's built-in validator
+        if (!isValidObjectId(id)) {
+            return null;
+        }
+        return await this.userModel.findById(id).exec();
+    }
+
+    async findByIdIn(ids: string[]): Promise<UserDocument[]> {
+        return await this.userModel.find({ _id: { $in: ids } }).exec();
+    }
+
+    async findByEmail(email: string): Promise<UserDocument | null> {
+        return await this.userModel.findOne({ email }).exec();
+    }
 
     async create(createUserDto: CreateUserDto) {
         const hashedPassword = await bcrypt.hash(createUserDto.password, PASSWORD_HASH_ROUNDS);
@@ -41,12 +48,16 @@ export class UsersService {
     async put(id: string, putUserDto: PutUserDto): Promise<UserDto | null> {
         const updateData: any = { ...putUserDto };
 
-    if (putUserDto.password) {
-        updateData.hashed_password = await bcrypt.hash(putUserDto.password, PASSWORD_HASH_ROUNDS);
-        delete updateData.password;
-    }
+        if (putUserDto.password) {
+            updateData.hashed_password = await bcrypt.hash(putUserDto.password, PASSWORD_HASH_ROUNDS);
+            delete updateData.password;
+        }
 
-    return this.userModel.findByIdAndUpdate(id, updateData, { new: true }).exec();
+        const updatedRecord = await this.userModel.findByIdAndUpdate(id, updateData, { new: true }).exec();
+        if (!updatedRecord) {
+            throw new NotFoundException("Không tìm thấy user với id đã cho");
+        }
+        return updatedRecord;
     }
 
     async patch(id: string, patchUserDto: PatchUserDTO): Promise<UserDto | null> {
@@ -57,7 +68,11 @@ export class UsersService {
             delete updateData.password;
         }
 
-        return this.userModel.findByIdAndUpdate(id, updateData, { new: true }).exec();
+        const updatedRecord = await this.userModel.findByIdAndUpdate(id, updateData, { new: true }).exec();
+        if (!updatedRecord) {
+            throw new NotFoundException("Không tìm thấy user với id đã cho");
+        }
+        return updatedRecord;
     }
 
     async deleteUserById(deleteUserDto: DeleteUserDto) {

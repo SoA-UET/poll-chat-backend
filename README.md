@@ -1,6 +1,10 @@
-# Simple API Server
+# poll-chat-backend
 
-- [Simple API Server](#simple-api-server)
+- [poll-chat-backend](#poll-chat-backend)
+  - [Giới thiệu](#giới-thiệu)
+  - [Đặc tả yêu cầu](#đặc-tả-yêu-cầu)
+    - [Yêu cầu chức năng](#yêu-cầu-chức-năng)
+    - [Yêu cầu phi chức năng](#yêu-cầu-phi-chức-năng)
   - [Cài đặt](#cài-đặt)
   - [Chạy ứng dụng](#chạy-ứng-dụng)
     - [Development](#development)
@@ -12,6 +16,35 @@
     - [Directory Structure](#directory-structure)
     - [Modules](#modules)
   - [Tác giả](#tác-giả)
+
+## Giới thiệu
+
+Backend của Poll Chat App.
+
+Poll Chat App chứng minh toàn bộ API của một real-time chat
+application vẫn có thể hoàn toàn RESTful (RMM level 3).
+
+Đối với việc gửi và nhận tin nhắn tức thì (real-time),
+Poll Chat App định nghĩa các REST API endpoints và sử
+dụng kỹ thuật HTTP long-polling nhằm đạt yêu cầu real-time.
+
+Nhờ đó, toàn bộ API của Poll Chat App đều thỏa mãn RESTful.
+
+## Đặc tả yêu cầu
+
+### Yêu cầu chức năng
+
+1. Cho phép đăng ký, đăng nhập.
+2. Người dùng có thể tạo nhóm (group) từ 1 người trở lên.
+3. Người dùng có thể đặt/đổi tên nhóm.
+4. Người dùng có thể tìm nhóm theo tên và tham gia nhóm.
+5. Người dùng có thể nhắn tin trong nhóm.
+6. Người dùng có thể nhận được tin nhắn gửi bởi các thành viên khác trong nhóm theo thời gian thực khi họ online.
+
+### Yêu cầu phi chức năng
+
+1. Tin nhắn phải được gửi đến đúng nhóm, đúng thứ tự theo thời gian được gửi.
+2. Trong cùng một nhóm, người đang online sẽ thấy tin nhắn mới trong thời gian dưới 200 (ms) kể từ thời điểm tin nhắn đó được gửi (trong trường hợp không có sự cố mạng, nghẽn mạng).
 
 ## Cài đặt
 
