@@ -11,7 +11,7 @@ export class User {
     hashed_password: string;
 
     @Prop({ required: true })
-    full_name: string;
+    fullName: string;
 }
 
 export type UserDocument = User & Document;

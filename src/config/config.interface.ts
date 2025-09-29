@@ -4,4 +4,5 @@ export interface Config {
   PORT: number;
   MONGODB_URI: string;
   SECRET_KEY: string;
+  FRONTEND_URLS: string[];
 }

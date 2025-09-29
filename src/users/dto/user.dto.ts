@@ -14,5 +14,5 @@ export class UserDto {
 
     @ApiProperty()
     @Expose()
-    readonly full_name: string;
+    readonly fullName: string;
 };

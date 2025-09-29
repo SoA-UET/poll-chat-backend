@@ -20,7 +20,7 @@ export class CreateUserDto {
     @IsNotEmpty({
         message: "Họ và tên không được để trống.",
     })
-    readonly full_name: string;
+    readonly fullName: string;
 
 
 
