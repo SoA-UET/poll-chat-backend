@@ -33,7 +33,12 @@ export class GroupsService {
     async findByMembership(userId: string): Promise<GroupDocument[]> {
         const groupUserRecords = await this.groupUserModel.find({ user_id: userId }).exec();
         const groupIds = groupUserRecords.map(r => r.group_id);
-        return await this.groupModel.find({ _id: { $in: groupIds } }).exec();
+        return await this.groupModel.find({
+            $or: [
+                { _id: { $in: groupIds } },
+                { createdBy: userId },
+            ]
+        }).exec();
     }
 
     async findById(id: string): Promise<GroupDocument> {
@@ -103,7 +108,16 @@ export class GroupsService {
         return { message: "Xóa thành công", id: id };
     }
 
-    async getMessagesInGroupAfter(groupId: string, createdAtAfter: Date) {
+    async getMessagesInGroupAfter(groupId: string, createdAtAfter?: Date) {
         return await this.messagesService.findByGroupIdAndCreatedAtAfter(groupId, createdAtAfter);
+    }
+
+    async sendMessage(groupId: string, senderId: string, content: string) {
+        const createMessageDto = {
+            groupId,
+            senderId,
+            content,
+        };
+        return await this.messagesService.create(createMessageDto);
     }
 }

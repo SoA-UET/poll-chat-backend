@@ -33,7 +33,7 @@ import { GroupsModule } from './groups/groups.module';
       throttlers: [
         {
           ttl: 60000, // milliseconds
-          limit: 10, // max requests
+          limit: 60000, // max requests
         },
       ],
     }),
