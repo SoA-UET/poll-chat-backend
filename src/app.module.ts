@@ -10,6 +10,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { AuthModule } from './auth/auth.module';
 import { MessagesModule } from './messages/messages.module';
 import { GroupsModule } from './groups/groups.module';
+import { RabbitmqModule } from './rabbitmq/rabbitmq.module';
 
 @Module({
   imports: [
@@ -32,8 +33,8 @@ import { GroupsModule } from './groups/groups.module';
       errorMessage: "Quá nhiều requests. Vui lòng thử lại sau.",
       throttlers: [
         {
-          ttl: 60000, // milliseconds
-          limit: 10, // max requests
+          ttl: 60000,   // milliseconds
+          limit: 60000, // max requests
         },
       ],
     }),
@@ -45,6 +46,8 @@ import { GroupsModule } from './groups/groups.module';
     GroupsModule,
 
     MessagesModule,
+
+    RabbitmqModule,
   ],
 
   controllers: [AppController],

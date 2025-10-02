@@ -10,12 +10,15 @@ import { PatchGroupDto } from "./dto/patch-group.dto";
 import { UsersService } from "src/users/users.service";
 import { UserDocument } from "src/users/user.schema";
 import { MessagesService } from "src/messages/messages.service";
+import { HTTP_LONG_POLLING_TIMEOUT_MS } from "src/common/utils/constants";
+import { RabbitmqService } from "src/rabbitmq/rabbitmq.service";
 
 @Injectable()
 export class GroupsService {
     constructor(
         private usersService: UsersService,
         private messagesService: MessagesService,
+        private rabbitmqService: RabbitmqService,
         @InjectModel(Group.name) private groupModel: Model<GroupDocument>,
         @InjectModel(GroupUser.name) private groupUserModel: Model<GroupUserDocument>,
     ) {}
@@ -77,8 +80,15 @@ export class GroupsService {
     }
 
     async isUserInGroup(groupId: string, userId: string): Promise<boolean> {
-        const anything = await this.groupUserModel.exists({ group_id: groupId, user_id: userId }).exec();
-        return !!anything;
+        const isOwner = !!(await this.groupModel.exists({ _id: groupId, createdBy: userId }).exec());
+        if (isOwner) {
+            return true;
+        }
+        const isMember = !!(await this.groupUserModel.exists({ group_id: groupId, user_id: userId }).exec());
+        if (isMember) {
+            return true;
+        }
+        return false;
     }
 
     async put(id: string, putGroupDto: PutGroupDto): Promise<GroupDocument | null> {
@@ -105,5 +115,35 @@ export class GroupsService {
 
     async getMessagesInGroupAfter(groupId: string, createdAtAfter: Date) {
         return await this.messagesService.findByGroupIdAndCreatedAtAfter(groupId, createdAtAfter);
+    }
+
+    async getMessagesInGroupAfter_WithPolling(groupId: string, createdAtAfter: Date) {
+        const lastKnownTimestamp = this.groupIdToLastMessageTimestampMap.get(groupId) || new Date(0);
+
+        if (createdAtAfter < lastKnownTimestamp) {
+            return await this.messagesService.findByGroupIdAndCreatedAtAfter(groupId, createdAtAfter);
+        }
+
+        return new Promise(async (resolve) => {
+            const checkInterval = 2000; // 2 seconds
+            let elapsedTimeInMs = 0;
+
+            const intervalId = setInterval(async () => {
+                elapsedTimeInMs += checkInterval;
+
+                const newMessages = await this.messagesService.findByGroupIdAndCreatedAtAfter(groupId, createdAtAfter);
+                if (newMessages.length > 0) {
+                    const latestMessage = newMessages.reduce((latest, msg) =>
+                        msg.createdAt > latest.createdAt ? msg : latest, newMessages[0]);
+                    this.groupIdToLastMessageTimestampMap.set(groupId, latestMessage.createdAt);
+
+                    clearInterval(intervalId);
+                    resolve(newMessages);
+                } else if (elapsedTimeInMs >= HTTP_LONG_POLLING_TIMEOUT_MS) {
+                    clearInterval(intervalId);
+                    resolve([]);
+                }
+            }, checkInterval);
+        });
     }
 }

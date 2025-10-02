@@ -143,7 +143,7 @@ export class GroupsController {
 
     @MyGet({
         path: ':groupId/messages',
-        summary: "Lấy danh sách tin nhắn trong nhóm chat.",
+        summary: "Lấy danh sách tin nhắn trong nhóm chat. HTTP long-polling in effect!",
         response: {
             status: 200,
             description: "Thành công",
