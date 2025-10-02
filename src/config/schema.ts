@@ -12,4 +12,6 @@ export const validationSchema = Joi.object({
     .custom((value, helpers) => {
       return value.split(',').map(url => url.trim());
     }, 'Comma-separated URLs validation'),
+  
+  RABBITMQ_URL: Joi.string(),
 });

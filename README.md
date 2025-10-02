@@ -5,6 +5,7 @@
   - [Đặc tả yêu cầu](#đặc-tả-yêu-cầu)
     - [Yêu cầu chức năng](#yêu-cầu-chức-năng)
     - [Yêu cầu phi chức năng](#yêu-cầu-phi-chức-năng)
+  - [Phương pháp xử lý polling](#phương-pháp-xử-lý-polling)
   - [Cài đặt](#cài-đặt)
   - [Chạy ứng dụng](#chạy-ứng-dụng)
     - [Development](#development)
@@ -19,7 +20,9 @@
 
 ## Giới thiệu
 
-Backend của Poll Chat App.
+Đây là Backend của Poll Chat App.
+
+Frontend của Poll Chat App: <https://github.com/SoA-UET/poll-chat-frontend>
 
 Poll Chat App chứng minh toàn bộ API của một real-time chat
 application vẫn có thể hoàn toàn RESTful (RMM level 3).
@@ -29,6 +32,14 @@ Poll Chat App định nghĩa các REST API endpoints và sử
 dụng kỹ thuật HTTP long-polling nhằm đạt yêu cầu real-time.
 
 Nhờ đó, toàn bộ API của Poll Chat App đều thỏa mãn RESTful.
+
+![API docs](docs/images/api-docs.png)
+
+![demo 1](docs/images/frontend-1.png)
+
+![demo 2](docs/images/frontend-2.png)
+
+![demo 3](docs/images/frontend-3.png)
 
 ## Đặc tả yêu cầu
 
@@ -46,6 +57,35 @@ Nhờ đó, toàn bộ API của Poll Chat App đều thỏa mãn RESTful.
 1. Tin nhắn phải được gửi đến đúng nhóm, đúng thứ tự theo thời gian được gửi.
 2. Trong cùng một nhóm, người đang online sẽ thấy tin nhắn mới trong thời gian dưới 200 (ms) kể từ thời điểm tin nhắn đó được gửi (trong trường hợp không có sự cố mạng, nghẽn mạng).
 
+## Phương pháp xử lý polling
+
+- Khi gửi tin nhắn mới, backend sẽ thêm một message
+    vào queue fan-out của RabbitMQ, chứa ID của group
+    có message mới.
+
+- Khi client yêu cầu nhận tin nhắn trong một group
+    được gửi sau thời gian `X`, backend sẽ truy cập DB,
+    và lập tức trả về danh sách tin
+    nhắn thỏa mãn nếu danh sách đó không trống. Ngược lại,
+    backend chờ tín hiệu của RabbitMQ rằng group ID có
+    tin nhắn mới, thì mới query lại DB và trả về
+    tin nhắn mới. Tuy vậy sau thời gian timeout `T`,
+    nếu không có tín hiệu gì từ RabbitMQ rằng group
+    này có tin nhắn mới, backend sẽ trả về danh
+    sách rỗng.
+
+- Client nhận được danh sách tin nhắn mới sẽ thêm
+    tin nhắn mới (nếu có) vào giao diện chat. Client
+    cập nhật biến thời gian `X` bằng thời gian gửi của tin
+    nhắn mới nhất mà nó đã nhận được, sau đó lặp lại
+    bước yêu cầu nhận tin nhắn phía trên. Như vậy
+    đây là kỹ thuật **HTTP long-polling** nhằm đảm
+    bảo real-time cho ứng dụng chat, mà vẫn không
+    làm API vi phạm ràng buộc REST.
+
+- Thời gian timeout `T` được xác định trong
+    `src/common/utils/constants.ts`.
+
 ## Cài đặt
 
 1. Cài đặt nodejs dependencies:
@@ -54,7 +94,9 @@ Nhờ đó, toàn bộ API của Poll Chat App đều thỏa mãn RESTful.
     npm i
     ```
 
-2. Cài đặt và chạy MongoDB Community Edition.
+2. Cài đặt và chạy:
+  - MongoDB Community Edition (MongoDB Server).
+  - RabbitMQ
 
 3. Copy file `.env.example` sang file mới tên là `.env`,
     sau đó sửa các biến cho phù hợp.
@@ -146,7 +188,9 @@ module chứa code cho một tính năng (*feature*).
 module mới tương ứng:
 
 ```sh
-nest generate module $MODULE_NAME
+cd <project_root>
+
+npx nest generate module $MODULE_NAME
 ```
 
 ## Tác giả

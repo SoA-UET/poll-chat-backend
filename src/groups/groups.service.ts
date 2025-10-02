@@ -22,7 +22,7 @@ export class GroupsService {
         private rabbitmqService: RabbitmqService,
         @InjectModel(Group.name) private groupModel: Model<GroupDocument>,
         @InjectModel(GroupUser.name) private groupUserModel: Model<GroupUserDocument>,
-    ) {}
+    ) { }
 
     async findAll(): Promise<GroupDocument[]> {
         return await this.groupModel.find().exec();
@@ -63,18 +63,26 @@ export class GroupsService {
     }
 
     async addUsersToGroup(groupId: string, userIds: string[]): Promise<GroupUserDocument[]> {
-        const groupUsers = userIds.map(userId => ({
-            group_id: groupId,
-            user_id: userId,
-        }));
+        const bulkWriteRequest = userIds.map(userId => {
+            return {
+                updateOne: {
+                    filter: { group_id: groupId, user_id: userId },
+                    update: { group_id: groupId, user_id: userId },
+                    upsert: true,
+                }
+            };
+        });
 
-        return this.groupUserModel.insertMany(groupUsers);
+        await this.groupUserModel.bulkWrite(bulkWriteRequest);
+
+        return await this.groupUserModel.find({ group_id: groupId, user_id: { $in: userIds } }).exec();
     }
 
     async removeUsersFromGroup(groupId: string, userIds: string[]): Promise<void> {
         await this.groupUserModel.deleteMany({
             group_id: groupId,
-            user_id: { $in: userIds } },
+            user_id: { $in: userIds }
+        },
         ).exec();
     }
 
@@ -123,8 +131,13 @@ export class GroupsService {
         return await this.messagesService.findByGroupIdAndCreatedAtAfter(groupId, createdAtAfter);
     }
 
-    async getMessagesInGroupAfter_WithPolling(groupId: string, createdAtAfter: Date) {
+    async getMessagesInGroupAfter_WithPolling(groupId: string, createdAtAfter?: Date) {
         const callbackKey = `${groupId}-${createdAtAfter ? createdAtAfter.getTime() : 'null'}-${Date.now()}`;
+
+        const earlyList = await this.getMessagesInGroupAfter(groupId, createdAtAfter);
+        if (earlyList.length > 0) {
+            return earlyList;
+        }
 
         let _resolve!: (value: MessageDto[] | PromiseLike<MessageDto[]>) => void;
         let reject!: (reason?: any) => void;
@@ -135,16 +148,17 @@ export class GroupsService {
 
         const timeout = setTimeout(() => {
             resolve([]);
-        });
+        }, HTTP_LONG_POLLING_TIMEOUT_MS);
 
         const resolve: typeof _resolve = value => {
             this.rabbitmqService.unsubscribe(groupId, callbackKey);
             _resolve(value);
             clearTimeout(timeout);
+            console.log(`Long-polling resolved [${callbackKey}]`);
         };
 
         const onProbablyNewMessages = async (newMessagesInfo: NewMessagesInfo) => {
-            const list = await this.getMessagesInGroupAfter(groupId, createdAtAfter);
+            const list = await this.getMessagesInGroupAfter(newMessagesInfo.groupId, createdAtAfter);
             if (list.length > 0) {
                 resolve(list);
             }
@@ -161,6 +175,8 @@ export class GroupsService {
             senderId,
             content,
         };
-        return await this.messagesService.create(createMessageDto);
+        const message = await this.messagesService.create(createMessageDto);
+        this.rabbitmqService.publishNewMessagesInfo({ groupId });
+        return message;
     }
 }

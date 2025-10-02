@@ -159,7 +159,7 @@ export class GroupsController {
         @Param('groupId') groupId: string,
         @Query('createdAtAfter', new ParseDatePipe()) createdAtAfter?: Date,
     ) {
-        return this.groupsService.getMessagesInGroupAfter(
+        return this.groupsService.getMessagesInGroupAfter_WithPolling(
             groupId, createdAtAfter,
         );
     }

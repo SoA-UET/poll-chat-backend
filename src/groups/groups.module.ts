@@ -6,6 +6,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Group, GroupSchema } from './group.schema';
 import { GroupUser, GroupUserSchema } from './group-user.schema';
 import { MessagesModule } from 'src/messages/messages.module';
+import { RabbitmqModule } from 'src/rabbitmq/rabbitmq.module';
 
 @Module({
     providers: [GroupsService],
@@ -26,7 +27,9 @@ import { MessagesModule } from 'src/messages/messages.module';
                 name: GroupUser.name,
                 schema: GroupUserSchema,
             }
-        ])
+        ]),
+
+        RabbitmqModule,
     ],
 
     exports: [GroupsService],
