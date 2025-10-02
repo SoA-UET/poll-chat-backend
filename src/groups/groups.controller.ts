@@ -2,12 +2,14 @@ import { GroupsService } from "./groups.service";
 import { GroupDto } from "./dto/group.dto";
 import { MyController } from "src/common/decorators/my-controller";
 import { MyGet } from "src/common/decorators/routing/my-get.decorator";
-import { Body, Param, ParseDatePipe, Query, Req } from "@nestjs/common";
+import { Body, Param, ParseBoolPipe, ParseDatePipe, Query, Req } from "@nestjs/common";
 import { CreateGroupDto } from "./dto/create-group.dto";
 import { MyPost } from "src/common/decorators/routing/my-post.decorator";
 import { MyDelete } from "src/common/decorators/routing/my-delete.decorator";
 import { UserDto } from "src/users/dto/user.dto";
 import { MessageDto } from "src/messages/dto/message.dto";
+import { GroupUserDto } from "./dto/group-user.dto";
+import { SendMessageDto } from "./dto/send-message.dto";
 
 @MyController({
     prefix: "groups",
@@ -27,7 +29,7 @@ export class GroupsController {
     })
     async findByNameContains(
         @Query('name') nameContains: string,
-        @Query('membershipOnly') membershipOnly: boolean,
+        @Query('membershipOnly', ParseBoolPipe) membershipOnly: boolean,
         @Req() req: Request,
     ): Promise<GroupDto[]> {
         if (membershipOnly) {
@@ -90,7 +92,7 @@ export class GroupsController {
         response: {
             status: 201,
             description: "Thành công",
-            type: GroupDto,
+            type: GroupUserDto,
             isArray: true,
         },
         jwtAuth: true,
@@ -155,10 +157,33 @@ export class GroupsController {
     })
     async getMessagesInGroup(
         @Param('groupId') groupId: string,
-        @Query('createdAtAfter', new ParseDatePipe()) createdAtAfter: Date,
+        @Query('createdAtAfter', new ParseDatePipe()) createdAtAfter?: Date,
     ) {
         return this.groupsService.getMessagesInGroupAfter(
             groupId, createdAtAfter,
+        );
+    }
+
+    @MyPost({
+        path: ':groupId/messages',
+        summary: "Gửi tin nhắn trong nhóm chat.",
+        response: {
+            status: 201,
+            description: "Thành công",
+            type: MessageDto,
+        },
+        jwtAuth: true,
+        mustBeInGroup: true,
+    })
+    async sendMessage(
+        @Param('groupId') groupId: string,
+        @Body() sendMessageDto: SendMessageDto,
+        @Req() req: Request,
+    ) {
+        const senderId = req['user'].id as string;
+        return await this.groupsService.sendMessage(
+            groupId, senderId,
+            sendMessageDto.content,
         );
     }
 }

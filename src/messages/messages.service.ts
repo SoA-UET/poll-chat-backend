@@ -3,6 +3,7 @@ import { InjectModel } from "@nestjs/mongoose";
 import { Message, MessageDocument } from "./message.schema";
 import { Model } from "mongoose";
 import { MessageDto } from "./dto/message.dto";
+import { CreateMessageDto } from "./dto/create-message.dto";
 
 @Injectable()
 export class MessagesService {
@@ -12,14 +13,23 @@ export class MessagesService {
 
     async findByGroupIdAndCreatedAtAfter(
         groupId: string,
-        createdAtAfter: Date,
+        createdAtAfter?: Date,
     ): Promise<MessageDto[]> {
         return await this.messageModel
             .find({
                 groupId,
-                createdAt: { $gt: createdAtAfter },
+                ...(
+                    createdAtAfter ? { createdAt: { $gt: createdAtAfter } } : {}
+                ),
             })
             .sort({ createdAt: 1 })
             .exec();
+    }
+
+    async create(
+        createMessageDto: CreateMessageDto,
+    ): Promise<MessageDocument> {
+        const newMessage = new this.messageModel(createMessageDto);
+        return newMessage.save();
     }
 }

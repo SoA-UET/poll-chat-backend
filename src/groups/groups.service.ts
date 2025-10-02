@@ -11,7 +11,8 @@ import { UsersService } from "src/users/users.service";
 import { UserDocument } from "src/users/user.schema";
 import { MessagesService } from "src/messages/messages.service";
 import { HTTP_LONG_POLLING_TIMEOUT_MS } from "src/common/utils/constants";
-import { RabbitmqService } from "src/rabbitmq/rabbitmq.service";
+import { NewMessagesInfo, RabbitmqService } from "src/rabbitmq/rabbitmq.service";
+import { MessageDto } from "src/messages/dto/message.dto";
 
 @Injectable()
 export class GroupsService {
@@ -36,7 +37,12 @@ export class GroupsService {
     async findByMembership(userId: string): Promise<GroupDocument[]> {
         const groupUserRecords = await this.groupUserModel.find({ user_id: userId }).exec();
         const groupIds = groupUserRecords.map(r => r.group_id);
-        return await this.groupModel.find({ _id: { $in: groupIds } }).exec();
+        return await this.groupModel.find({
+            $or: [
+                { _id: { $in: groupIds } },
+                { createdBy: userId },
+            ]
+        }).exec();
     }
 
     async findById(id: string): Promise<GroupDocument> {
@@ -113,37 +119,48 @@ export class GroupsService {
         return { message: "Xóa thành công", id: id };
     }
 
-    async getMessagesInGroupAfter(groupId: string, createdAtAfter: Date) {
+    async getMessagesInGroupAfter(groupId: string, createdAtAfter?: Date) {
         return await this.messagesService.findByGroupIdAndCreatedAtAfter(groupId, createdAtAfter);
     }
 
     async getMessagesInGroupAfter_WithPolling(groupId: string, createdAtAfter: Date) {
-        const lastKnownTimestamp = this.groupIdToLastMessageTimestampMap.get(groupId) || new Date(0);
+        const callbackKey = `${groupId}-${createdAtAfter ? createdAtAfter.getTime() : 'null'}-${Date.now()}`;
 
-        if (createdAtAfter < lastKnownTimestamp) {
-            return await this.messagesService.findByGroupIdAndCreatedAtAfter(groupId, createdAtAfter);
-        }
-
-        return new Promise(async (resolve) => {
-            const checkInterval = 2000; // 2 seconds
-            let elapsedTimeInMs = 0;
-
-            const intervalId = setInterval(async () => {
-                elapsedTimeInMs += checkInterval;
-
-                const newMessages = await this.messagesService.findByGroupIdAndCreatedAtAfter(groupId, createdAtAfter);
-                if (newMessages.length > 0) {
-                    const latestMessage = newMessages.reduce((latest, msg) =>
-                        msg.createdAt > latest.createdAt ? msg : latest, newMessages[0]);
-                    this.groupIdToLastMessageTimestampMap.set(groupId, latestMessage.createdAt);
-
-                    clearInterval(intervalId);
-                    resolve(newMessages);
-                } else if (elapsedTimeInMs >= HTTP_LONG_POLLING_TIMEOUT_MS) {
-                    clearInterval(intervalId);
-                    resolve([]);
-                }
-            }, checkInterval);
+        let _resolve!: (value: MessageDto[] | PromiseLike<MessageDto[]>) => void;
+        let reject!: (reason?: any) => void;
+        const promise = new Promise<MessageDto[]>((res, rej) => {
+            _resolve = res;
+            reject = rej;
         });
+
+        const timeout = setTimeout(() => {
+            resolve([]);
+        });
+
+        const resolve: typeof _resolve = value => {
+            this.rabbitmqService.unsubscribe(groupId, callbackKey);
+            _resolve(value);
+            clearTimeout(timeout);
+        };
+
+        const onProbablyNewMessages = async (newMessagesInfo: NewMessagesInfo) => {
+            const list = await this.getMessagesInGroupAfter(groupId, createdAtAfter);
+            if (list.length > 0) {
+                resolve(list);
+            }
+        };
+
+        this.rabbitmqService.subscribe(groupId, callbackKey, onProbablyNewMessages);
+
+        return promise;
+    }
+
+    async sendMessage(groupId: string, senderId: string, content: string) {
+        const createMessageDto = {
+            groupId,
+            senderId,
+            content,
+        };
+        return await this.messagesService.create(createMessageDto);
     }
 }
